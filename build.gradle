@@ -1,0 +1,119 @@
+apply plugin: "groovy"
+apply plugin: "eclipse"
+apply plugin: 'license'
+apply plugin: 'maven'
+apply plugin: 'signing'
+
+group = 'com.crygier'
+version = '1.0.0'
+
+buildscript {
+	repositories {
+		mavenCentral()
+	}
+
+	dependencies {
+		classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.6.0'
+	}
+}
+
+
+repositories {
+    mavenCentral()
+    maven {
+        url "http://oss.sonatype.org/content/repositories/snapshots/"
+    }
+}
+
+sourceSets {
+    main {
+        java { srcDirs = [] } // no source dirs
+        groovy { srcDirs = ['src/main/groovy', 'src/main/java'] } // includes all .groovy and .java files under src
+   }
+}
+
+dependencies {
+    groovy "org.codehaus.groovy:groovy:2.0.0"
+    
+    compile "org.springframework:spring-core:3.1.1.RELEASE"
+    compile "org.springframework:spring-web:3.1.1.RELEASE"
+    compile "org.springframework:spring-webmvc:3.1.1.RELEASE"
+    compile "org.springframework:spring-oxm:3.1.1.RELEASE"
+    compile 'commons-lang:commons-lang:2.6'
+	compile 'servletapi:servletapi:2.4'
+	
+    runtime 'log4j:log4j:1.2.17'
+    runtime 'org.slf4j:slf4j-log4j12:1.5.8'
+    runtime 'org.codehaus.jackson:jackson-mapper-asl:1.9.3'
+    runtime 'com.thoughtworks.xstream:xstream:1.4.2'
+    
+    testCompile 'org.spockframework:spock-core:0.7-groovy-2.0-SNAPSHOT'
+}
+
+artifacts {
+	archives jar
+}
+
+signing {
+	sign configurations.archives
+}
+
+license {
+	ext.year = Calendar.getInstance().get(Calendar.YEAR)
+	ext.name = 'John Crygier'
+}
+
+uploadArchives {
+	repositories {
+		mavenDeployer {
+			beforeDeployment { MavenDeployment deployment -> signPom(deployment) }
+ 
+			repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+			  authentication(userName: sonatypeUsername, password: sonatypePassword)
+			}
+ 
+			pom.project {
+			   name 'SpringUtils'
+			   packaging 'jar'
+			   description 'SpringUtils is a collection of utility classes for use with Spring and SpringMVC'
+			   url 'https://github.com/johnedc/SpringUtils'
+ 
+			   scm {
+				   url 'https://github.com/johnedc/SpringUtils.git'
+				   connection 'https://github.com/johnedc/SpringUtils.git'
+				   developerConnection 'https://github.com/johnedc/SpringUtils.git'
+			   }
+ 
+			   licenses {
+				   license {
+					   name 'The Apache Software License, Version 2.0'
+					   url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+					   distribution 'repo'
+				   }
+			   }
+ 
+			   developers {
+				   developer {
+					   id 'johnedc'
+					   name 'John Crygier'
+				   }
+			   }
+		   }
+ 
+		   //mess with the generated pom to set the 'packaging' tag
+		   pom.withXml { XmlProvider xmlProvider ->
+			   def xml = xmlProvider.asString()
+			   def pomXml = new XmlParser().parse(new ByteArrayInputStream(xml.toString().bytes))
+ 
+			   pomXml.version[0] + { packaging('jar') }
+ 
+			   def newXml = new StringWriter()
+			   def printer = new XmlNodePrinter(new PrintWriter(newXml))
+			   printer.preserveWhitespace = true
+			   printer.print(pomXml)
+			   xml.setLength(0)
+			   xml.append(newXml.toString())
+		   }
+		}
+	}
+}
