@@ -5,7 +5,7 @@ apply plugin: 'maven'
 apply plugin: 'signing'
 
 group = 'com.crygier'
-version = '1.0.0'
+version = '1.0.1'
 
 buildscript {
 	repositories {
@@ -50,8 +50,29 @@ dependencies {
     testCompile 'org.spockframework:spock-core:0.7-groovy-2.0-SNAPSHOT'
 }
 
+task packageJavadoc(type: Jar, dependsOn: 'javadoc') {
+	from javadoc.destinationDir
+	classifier = 'javadoc'
+}
+
+task packageSources(type: Jar) {
+	from sourceSets.main.allSource
+	from sourceSets.test.allSource
+	
+	classifier = 'sources'
+}
+
 artifacts {
 	archives jar
+	
+	archives packageJavadoc {
+        ext.type = 'javadoc' 
+    }
+	
+	archives packageSources {
+		ext.type = 'sources'
+	}
+
 }
 
 signing {
@@ -66,10 +87,10 @@ license {
 uploadArchives {
 	repositories {
 		mavenDeployer {
-			beforeDeployment { MavenDeployment deployment -> signPom(deployment) }
- 
+			beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+			
 			repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-			  authentication(userName: sonatypeUsername, password: sonatypePassword)
+				authentication(userName: sonatypeUsername, password: sonatypePassword)
 			}
  
 			pom.project {

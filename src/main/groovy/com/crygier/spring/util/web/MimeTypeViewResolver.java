@@ -56,24 +56,28 @@ import org.springframework.web.servlet.view.xml.MarshallingView;
  * to allow for extremely simple REST-like interfaces.  A sample Spring Setup would be as follows:
  * 
  * <pre>
-   <bean id="tilesViewResolver" class="org.springframework.web.servlet.view.UrlBasedViewResolver"
-	      p:viewClass="org.springframework.web.servlet.view.tiles2.TilesView" />
- 
- 	<bean class="com.crygier.spring.util.web.MimeTypeViewResolver">
- 		<property name="mimeTypeToViewResolver">
- 			<map>
- 				<entry key="text/html" value-ref="tilesViewResolver"/>
- 			</map>
- 		</property>
- 	</bean>
+ * {@code
+ *  <bean id="tilesViewResolver" class="org.springframework.web.servlet.view.UrlBasedViewResolver"
+ *        p:viewClass="org.springframework.web.servlet.view.tiles2.TilesView" />
+ *  
+ *  <bean class="com.crygier.spring.util.web.MimeTypeViewResolver">
+ *    <property name="mimeTypeToViewResolver">
+ *      <map>
+ *        <entry key="text/html" value-ref="tilesViewResolver"/>
+ *      </map>
+ *    </property>
+ *  </bean>
+ * 	}
  * </pre>
  * 
  * If you don't set any mappings, there are several defaults:
+ * <pre>
  * text/html - org.springframework.web.servlet.view.InternalResourceViewResolver
  *           - Default Prefix is /.  Override by setting 'defaultInternalResourcePrefix'
  *           - Default Suffix is .jsp.  Override by setting 'defaultInternalResourceSuffix'
  * application/json - org.springframework.web.servlet.view.json.MappingJacksonJsonView
  * text/xml - org.springframework.oxm.xstream.XStreamMarshaller
+ * </pre>
  * 
  * This means that Controllers should know nothing about Views, and should use the @RequestMapping annotation in this
  * class to tell it how to resolve views that need a name, just as the JSP view resolver.  So, to map to a JSP view with
@@ -90,6 +94,7 @@ public class MimeTypeViewResolver extends AbstractCachingViewResolver implements
 	private List<HandlerMapping> handlerMappings;
 	
 	private Map<String, ViewResolver> mimeTypeToViewResolver = new HashMap<String, ViewResolver>();
+	private ViewResolver defaultResolver;
 	private String defaultInternalResourcePrefix = "/";
 	private String defaultInternalResourceSuffix = ".jsp";
 	
@@ -101,7 +106,7 @@ public class MimeTypeViewResolver extends AbstractCachingViewResolver implements
 
 		String acceptHeader = getCurrentRequestAttributes().getRequest().getHeader("Accept");
 		
-		List<MediaType> acceptableMediaTypes = null;
+		List<MediaType> acceptableMediaTypes = new ArrayList<MediaType>();
 		if (StringUtils.hasText(acceptHeader)) {
 			try {
 				acceptableMediaTypes = MediaType.parseMediaTypes(acceptHeader);
@@ -119,11 +124,14 @@ public class MimeTypeViewResolver extends AbstractCachingViewResolver implements
 				return viewResolver.resolveViewName(name, locale);
 		}
 		
-		logger.warn("No view resolvers found, backing onto Default text/html resolver");
-		return mimeTypeToViewResolver.get(MediaType.TEXT_HTML_VALUE).resolveViewName(name, locale);
+		logger.warn("No matching view resolvers found, backing onto Default resolver: " + defaultResolver);
+		return defaultResolver.resolveViewName(name, locale);
 	}
 	
 	protected ViewResolver findViewResolverForMediaType(MediaType requestedMediaType) {
+		if (requestedMediaType.equals(MediaType.ALL))
+			return defaultResolver;
+		
 		for (String mimeType : mimeTypeToViewResolver.keySet()) {
 			MediaType searchingType = MediaType.parseMediaType(mimeType);
 			
@@ -131,7 +139,7 @@ public class MimeTypeViewResolver extends AbstractCachingViewResolver implements
 				return mimeTypeToViewResolver.get(mimeType);
 		}
 		
-		return null;
+		return defaultResolver;
 	}
 	
 	/**
@@ -202,6 +210,8 @@ public class MimeTypeViewResolver extends AbstractCachingViewResolver implements
 			viewResolver.setApplicationContext(getApplicationContext());
 			
 			mimeTypeToViewResolver.put(MediaType.TEXT_HTML_VALUE, viewResolver);
+			if (defaultResolver == null)
+				defaultResolver = viewResolver;
 		}
 		
 		if (mimeTypeToViewResolver.containsKey(MediaType.APPLICATION_JSON_VALUE) == false) {
@@ -260,6 +270,16 @@ public class MimeTypeViewResolver extends AbstractCachingViewResolver implements
 	 */
 	public void setDefaultInternalResourceSuffix(String defaultInternalResourceSuffix) {
 		this.defaultInternalResourceSuffix = defaultInternalResourceSuffix;
+	}
+	
+	/**
+	 * Sets the default view resolver.  If a header comes in that doesn't match anything (or everything)
+	 * this is the view resolver that will be used.
+	 * 
+	 * @param defaultResolver
+	 */
+	public void setDefaultResolver(ViewResolver defaultResolver) {
+		this.defaultResolver = defaultResolver;
 	}
 	
 	@Override
